@@ -2,6 +2,7 @@ import socket  # noqa: F401
 import threading
 import sys
 import os
+import gzip
 
 def handle_client(client_connection, directory_path):
     try:
@@ -23,32 +24,35 @@ def handle_client(client_connection, directory_path):
         elif url_path.startswith("/echo/"):
             echo_string = url_path[6:]
             content_length = len(echo_string)
-            # 1. วนลูปค้นหาหัวข้อ Accept-Encoding ในกลุ่ม Headers ที่ส่งเข้ามา
+            
             accept_encoding_value = ""
             for line in all_lines[1:]:
                 if line.lower().startswith("accept-encoding:"):
                     accept_encoding_value = line.split(": ", 1)[1].strip()
                     break
             
-            # 2. เช็กเงื่อนไข: ถ้า Client ระบุว่ารองรับระบบ gzip
+            
             if "gzip" in accept_encoding_value.lower():
-                response_text = (
+                compressed_body = gzip.compress(echo_string.encode())
+                content_length = len(compressed_body)
+                response_headers = (
                     f"HTTP/1.1 200 OK\r\n"
                     f"Content-Type: text/plain\r\n"
-                    f"Content-Encoding: gzip\r\n"  # 💡 แถมหัวข้อนี้กลับไปบอกว่าระบบเราเข้าใจ gzip นะ
+                    f"Content-Encoding: gzip\r\n" 
                     f"Content-Length: {content_length}\r\n"
                     f"\r\n"
-                    f"{echo_string}"
                 )
+                response = response_headers.encode() + compressed_body
             else:
-                response_text = (
+                raw_body = echo_string.encode()
+                content_length = len(raw_body)
+                response_headers = (
                     f"HTTP/1.1 200 OK\r\n"
                     f"Content-Type: text/plain\r\n"
                     f"Content-Length: {content_length}\r\n"
                     f"\r\n"
-                    f"{echo_string}"
                 )
-            response = response_text.encode()
+                response = response_headers.encode() + raw_body
 
         elif url_path == "/user-agent":
             user_agent_value = ""
