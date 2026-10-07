@@ -23,13 +23,31 @@ def handle_client(client_connection, directory_path):
         elif url_path.startswith("/echo/"):
             echo_string = url_path[6:]
             content_length = len(echo_string)
-            response_text = (
-                f"HTTP/1.1 200 OK\r\n"
-                f"Content-Type: text/plain\r\n"
-                f"Content-Length: {content_length}\r\n"
-                f"\r\n"
-                f"{echo_string}"
-            )
+            # 1. วนลูปค้นหาหัวข้อ Accept-Encoding ในกลุ่ม Headers ที่ส่งเข้ามา
+            accept_encoding_value = ""
+            for line in all_lines[1:]:
+                if line.lower().startswith("accept-encoding:"):
+                    accept_encoding_value = line.split(": ", 1)[1].strip()
+                    break
+            
+            # 2. เช็กเงื่อนไข: ถ้า Client ระบุว่ารองรับระบบ gzip
+            if "gzip" in accept_encoding_value.lower():
+                response_text = (
+                    f"HTTP/1.1 200 OK\r\n"
+                    f"Content-Type: text/plain\r\n"
+                    f"Content-Encoding: gzip\r\n"  # 💡 แถมหัวข้อนี้กลับไปบอกว่าระบบเราเข้าใจ gzip นะ
+                    f"Content-Length: {content_length}\r\n"
+                    f"\r\n"
+                    f"{echo_string}"
+                )
+            else:
+                response_text = (
+                    f"HTTP/1.1 200 OK\r\n"
+                    f"Content-Type: text/plain\r\n"
+                    f"Content-Length: {content_length}\r\n"
+                    f"\r\n"
+                    f"{echo_string}"
+                )
             response = response_text.encode()
 
         elif url_path == "/user-agent":
