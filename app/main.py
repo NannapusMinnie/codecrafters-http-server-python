@@ -1,7 +1,9 @@
 import socket  # noqa: F401
 import threading
+import sys
+import os
 
-def handle_client(client_connection):
+def handle_client(client_connection, directory_path):
     try:
         request_data = client_connection.recv(1024).decode()
         if not request_data:
@@ -42,6 +44,23 @@ def handle_client(client_connection):
                 f"{user_agent_value}"
             )
             response = response_text.encode()
+        elif url_path.startswith("/files/"):
+            filename = url_path[7:]
+            file_path = os.path.join(directory_path, filename)
+            if os.path.exists(file_path):
+                with open(file_path, "r") as file:
+                    file_content = file.read()           
+                content_length = len(file_content)
+                response_text = (
+                    f"HTTP/1.1 200 OK\r\n"
+                    f"Content-Type: application/octet-stream\r\n"
+                    f"Content-Length: {content_length}\r\n"
+                    f"\r\n"
+                    f"{file_content}"
+                )
+                response = response_text.encode()
+            else:
+                response = b"HTTP/1.1 404 Not Found\r\n\r\n"         
         else:
             response = b"HTTP/1.1 404 Not Found\r\n\r\n"
         
@@ -54,10 +73,15 @@ def main():
     # You can use print statements as follows for debugging, they'll be visible when running tests.
     print("Logs from your program will appear here!")
 
+    directory_path = ""
+    if "--directory" in sys.argv:
+        dir_index = sys.argv.index("--directory")
+        directory_path = sys.argv[dir_index + 1]
+
     server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
     while True:
         client_connection, client_address = server_socket.accept()
-        client_thread = threading.Thread(target=handle_client, args=[client_connection])
+        client_thread = threading.Thread(target=handle_client, args=[client_connection, directory_path])
         client_thread.start()
 
 if __name__ == "__main__":
