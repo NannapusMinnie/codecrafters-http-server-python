@@ -17,10 +17,21 @@ def handle_client(client_connection, directory_path):
             
             url_path = request_line_components[1]
             http_method = request_line_components[0]
-            
+
+
+            should_close_connection = False
+            for line in all_lines[1:]:
+                if line.lower().startswith("connection:"):
+                    connection_value = line.split(": ", 1)[1].strip()
+                    if connection_value.lower() == "close":
+                        should_close_connection = True
+                    break
+
+            connection_header = "Connection: close\r\n" if should_close_connection else ""
             
             if url_path == "/":
-                response = b"HTTP/1.1 200 OK\r\n\r\n"
+                response_text = f"HTTP/1.1 200 OK\r\n{connection_header}\r\n"
+                response = response_text.encode()
 
             elif url_path.startswith("/echo/"):
                 echo_string = url_path[6:]
@@ -39,7 +50,8 @@ def handle_client(client_connection, directory_path):
                     response_headers = (
                         f"HTTP/1.1 200 OK\r\n"
                         f"Content-Type: text/plain\r\n"
-                        f"Content-Encoding: gzip\r\n" 
+                        f"Content-Encoding: gzip\r\n"
+                        f"{connection_header}" 
                         f"Content-Length: {content_length}\r\n"
                         f"\r\n"
                     )
@@ -50,6 +62,7 @@ def handle_client(client_connection, directory_path):
                     response_headers = (
                         f"HTTP/1.1 200 OK\r\n"
                         f"Content-Type: text/plain\r\n"
+                        f"{connection_header}"
                         f"Content-Length: {content_length}\r\n"
                         f"\r\n"
                     )
@@ -65,6 +78,7 @@ def handle_client(client_connection, directory_path):
                 response_text = (
                     f"HTTP/1.1 200 OK\r\n"
                     f"Content-Type: text/plain\r\n"
+                    f"{connection_header}"
                     f"Content-Length: {content_length}\r\n"
                     f"\r\n"
                     f"{user_agent_value}"
@@ -83,13 +97,15 @@ def handle_client(client_connection, directory_path):
                         response_text = (
                             f"HTTP/1.1 200 OK\r\n"
                             f"Content-Type: application/octet-stream\r\n"
+                            f"{connection_header}"
                             f"Content-Length: {content_length}\r\n"
                             f"\r\n"
                             f"{file_content}"
                         )
                         response = response_text.encode()
                     else:
-                        response = b"HTTP/1.1 404 Not Found\r\n\r\n"
+                        response_text = f"HTTP/1.1 404 Not Found\r\n{connection_header}\r\n"
+                        response = response_text.encode()
 
                 elif http_method == "POST":
                     request_parts_by_body = request_data.split("\r\n\r\n", 1)
@@ -97,14 +113,21 @@ def handle_client(client_connection, directory_path):
 
                     with open(file_path, "w") as file:
                         file.write(request_body)  
-                    response = b"HTTP/1.1 201 Created\r\n\r\n"
+                    response_text = f"HTTP/1.1 201 Created\r\n{connection_header}\r\n"
+                    response = response_text.encode()
                 else:
-                    response = b"HTTP/1.1 404 Not Found\r\n\r\n"
+                    response_text = f"HTTP/1.1 404 Not Found\r\n{connection_header}\r\n"
+                    response = response_text.encode()
 
             else:
-                response = b"HTTP/1.1 404 Not Found\r\n\r\n"
+                response_text = f"HTTP/1.1 404 Not Found\r\n{connection_header}\r\n"
+                response = response_text.encode()
             
             client_connection.sendall(response)
+
+            if should_close_connection:
+                break
+            
     finally:
         client_connection.close()
         
