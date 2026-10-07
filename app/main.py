@@ -29,6 +29,21 @@ def main():
             f"{echo_string}"
         )
         response = response_text.encode()
+    elif url_path == "/user-agent":
+        user_agent_value = ""
+        for line in all_lines[1:]:
+            if line.lower().startswith("user-agent:"):
+                user_agent_value = line.split(": ", 1)[1]
+                break 
+        content_length = len(user_agent_value)
+        response_text = (
+            f"HTTP/1.1 200 OK\r\n"
+            f"Content-Type: text/plain\r\n"
+            f"Content-Length: {content_length}\r\n"
+            f"\r\n"
+            f"{user_agent_value}"
+        )
+        response = response_text.encode()
     else:
         response = b"HTTP/1.1 404 Not Found\r\n\r\n"
 
