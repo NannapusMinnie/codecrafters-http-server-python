@@ -14,10 +14,12 @@ def handle_client(client_connection, directory_path):
         request_line_components = first_line.split(" ")
         
         url_path = request_line_components[1]
+        http_method = request_line_components[0]
         
         
         if url_path == "/":
             response = b"HTTP/1.1 200 OK\r\n\r\n"
+
         elif url_path.startswith("/echo/"):
             echo_string = url_path[6:]
             content_length = len(echo_string)
@@ -29,6 +31,7 @@ def handle_client(client_connection, directory_path):
                 f"{echo_string}"
             )
             response = response_text.encode()
+
         elif url_path == "/user-agent":
             user_agent_value = ""
             for line in all_lines[1:]:
@@ -44,23 +47,37 @@ def handle_client(client_connection, directory_path):
                 f"{user_agent_value}"
             )
             response = response_text.encode()
+
         elif url_path.startswith("/files/"):
             filename = url_path[7:]
             file_path = os.path.join(directory_path, filename)
-            if os.path.exists(file_path):
-                with open(file_path, "r") as file:
-                    file_content = file.read()           
-                content_length = len(file_content)
-                response_text = (
-                    f"HTTP/1.1 200 OK\r\n"
-                    f"Content-Type: application/octet-stream\r\n"
-                    f"Content-Length: {content_length}\r\n"
-                    f"\r\n"
-                    f"{file_content}"
-                )
-                response = response_text.encode()
+
+            if http_method == "GET":
+                if os.path.exists(file_path):
+                    with open(file_path, "r") as file:
+                        file_content = file.read()           
+                    content_length = len(file_content)
+                    response_text = (
+                        f"HTTP/1.1 200 OK\r\n"
+                        f"Content-Type: application/octet-stream\r\n"
+                        f"Content-Length: {content_length}\r\n"
+                        f"\r\n"
+                        f"{file_content}"
+                    )
+                    response = response_text.encode()
+                else:
+                    response = b"HTTP/1.1 404 Not Found\r\n\r\n"
+
+            elif http_method == "POST":
+                request_parts_by_body = request_data.split("\r\n\r\n", 1)
+                request_body = request_parts_by_body[1]
+
+                with open(file_path, "w") as file:
+                    file.write(request_body)  
+                response = b"HTTP/1.1 201 Created\r\n\r\n"
             else:
-                response = b"HTTP/1.1 404 Not Found\r\n\r\n"         
+                response = b"HTTP/1.1 404 Not Found\r\n\r\n"
+
         else:
             response = b"HTTP/1.1 404 Not Found\r\n\r\n"
         
